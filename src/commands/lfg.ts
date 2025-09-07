@@ -181,10 +181,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     .setFooter({ text: `VC: ${vc.name} • ${footer}` });
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`lfg.join`).setLabel('Join').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`lfg.joinvc:${vc.id}`).setLabel('Join VC').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`lfg.join:${vc.id}`).setLabel('Join').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`lfg.edit`).setLabel('Edit').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`lfg.cancel`).setLabel('Cancel').setStyle(ButtonStyle.Danger)
+    new ButtonBuilder().setCustomId(`lfg.cancel:${vc.id}`).setLabel('Cancel').setStyle(ButtonStyle.Danger)
   );
 
   // Send the card to the configured LFG text channel

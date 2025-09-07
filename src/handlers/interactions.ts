@@ -64,27 +64,35 @@ export function bindInteractionHandlers(client: Client) {
 }
 
 async function handleButton(i: ButtonInteraction) {
-  if (i.customId.startsWith('lfg.joinvc:')) {
+  if (i.customId.startsWith('lfg.join:')) {
     const vcId = i.customId.split(':')[1];
-    const vc = await i.guild!.channels.fetch(vcId);
     const member = i.member as GuildMember;
-    if (member.voice?.channel && vc?.isVoiceBased()) {
-      await member.voice.setChannel(vc.id);
-      return i.reply({ content: `Moved you to <#${vc.id}>.`, ephemeral: true });
-    }
-    return i.reply({
-      content: `Click to join: <#${vcId}>. If you connect to any VC, I can move you in.`,
-      ephemeral: true
-    });
+    try {
+      const vc = await i.guild!.channels.fetch(vcId);
+      if (member.voice?.channel && vc?.isVoiceBased()) {
+        await member.voice.setChannel(vc.id);
+        return i.reply({ content: `Moved you to <#${vc.id}>.`, ephemeral: true });
+      }
+      if (vc?.isVoiceBased()) {
+        return i.reply({ content: `Join VC: <#${vc.id}>`, ephemeral: true });
+      }
+    } catch {}
+    return i.reply({ content: 'VC not found.', ephemeral: true });
   }
 
-  if (i.customId === 'lfg.join') {
-    return i.reply({ content: 'Seat reserved. See the VC above to hop in!', ephemeral: true });
-  }
-
-  if (i.customId === 'lfg.cancel') {
+  if (i.customId.startsWith('lfg.cancel:')) {
+    const vcId = i.customId.split(':')[1];
+    try {
+      const ch = await i.guild!.channels.fetch(vcId);
+      if (ch?.type === ChannelType.GuildVoice) {
+        await ch.delete('LFG canceled by host');
+        lfgVcIds.delete(vcId);
+        const t = emptyTimers.get(vcId);
+        if (t) { clearTimeout(t); emptyTimers.delete(vcId); }
+      }
+    } catch {}
     await i.message.edit({ content: 'Listing archived by host.', embeds: [], components: [] });
-    return i.reply({ content: 'Archived.', ephemeral: true });
+    return i.reply({ content: 'Archived and VC removed.', ephemeral: true });
   }
 
   if (i.customId === 'lfg.edit') {
