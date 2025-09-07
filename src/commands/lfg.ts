@@ -110,9 +110,20 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   let topicSet = false;
   if (notes) {
     try {
-      const safe = notes.slice(0, 128);
-      await vc.edit({ topic: safe }, 'Set LFG notes as channel status');
-      topicSet = true;
+      const safe = notes
+        .replace(/https?:\/\/\S+/gi, '')
+        .replace(/discord\.gg\/\S+/gi, '')
+        .replace(/<@!?\d+>/g, '') // user mentions
+        .replace(/<@&\d+>/g, '') // role mentions
+        .replace(/<#[0-9]+>/g, '') // channel mentions
+        .replace(/@everyone|@here/gi, '[ping]')
+        .replace(/[\r\n]+/g, ' ')
+        .trim()
+        .slice(0, 128);
+      if (safe.length > 0) {
+        await vc.edit({ topic: safe }, 'Set LFG notes as channel status');
+        topicSet = true;
+      }
     } catch (err) {
       console.error('Failed to set VC topic', err);
     }
