@@ -41,14 +41,6 @@ export const data = new SlashCommandBuilder()
             { name: 'Any', value: 'Any' }
           )
       )
-      .addIntegerOption(o =>
-        o
-          .setName('need')
-          .setDescription('How many players needed')
-          .setRequired(true)
-          .setMinValue(0)
-          .setMaxValue(4)
-      )
       .addStringOption(o =>
         o
           .setName('rank')
@@ -60,17 +52,6 @@ export const data = new SlashCommandBuilder()
             { name: 'Diamond/Master', value: 'Diamond/Master' },
             { name: 'GM+', value: 'GM+' },
             { name: 'Mixed/Any', value: 'Mixed/Any' }
-          )
-      )
-      .addStringOption(o =>
-        o
-          .setName('role_need')
-          .setDescription('Needed role (5v5 only)')
-          .addChoices(
-            { name: 'Tank', value: 'Tank' },
-            { name: 'DPS', value: 'DPS' },
-            { name: 'Support', value: 'Support' },
-            { name: 'Any', value: 'Any' }
           )
       )
       .addStringOption(o => o.setName('notes').setDescription('Short notes').setMaxLength(120))
@@ -103,25 +84,6 @@ export const data = new SlashCommandBuilder()
             { name: 'Any', value: 'Any' }
           )
       )
-      .addIntegerOption(o =>
-        o
-          .setName('need')
-          .setDescription('How many players needed')
-          .setRequired(true)
-          .setMinValue(0)
-          .setMaxValue(4)
-      )
-      .addStringOption(o =>
-        o
-          .setName('role_need')
-          .setDescription('Needed role (5v5 only)')
-          .addChoices(
-            { name: 'Tank', value: 'Tank' },
-            { name: 'DPS', value: 'DPS' },
-            { name: 'Support', value: 'Support' },
-            { name: 'Any', value: 'Any' }
-          )
-      )
       .addStringOption(o => o.setName('notes').setDescription('Short notes').setMaxLength(120))
   )
   .setDMPermission(false);
@@ -130,8 +92,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const sub = interaction.options.getSubcommand();
   const mode = interaction.options.getString('mode', true);
   const intent = interaction.options.getString('intent', true);
-  const need = interaction.options.getInteger('need', true);
-  const roleNeed = interaction.options.getString('role_need') ?? 'Any';
+  // need and role_need removed
   const rank = sub === 'comp' ? interaction.options.getString('rank', true) : undefined;
   const notes = interaction.options.getString('notes') ?? '';
 
@@ -159,11 +120,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       : 'Auto expires in 60 minutes.';
 
   const isCompMode = sub === 'comp';
-  const roleText = mode === 'Comp-5v5' || mode === 'QP-5v5' ? roleNeed : 'Any';
-  const detailsParts = [
-    `**Needs:** ${need}`,
-    `**Role:** ${roleText}`
-  ];
+  const detailsParts: string[] = [];
   if (isCompMode && rank) detailsParts.push(`**Rank:** ${rank}`);
 
   const embed = new EmbedBuilder()
