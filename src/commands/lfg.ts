@@ -100,6 +100,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const vc = await guild.channels.create({
     name: `LFG • ${mode} • @${interaction.user.username}`,
     type: ChannelType.GuildVoice,
+    topic: notes || undefined,
     parent: guild.channels.cache.find(
       c => c.type === ChannelType.GuildCategory && c.name.toLowerCase().includes('lfg')
     )?.id,
