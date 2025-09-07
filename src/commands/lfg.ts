@@ -97,8 +97,16 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const notes = interaction.options.getString('notes') ?? '';
 
   const guild = interaction.guild!;
+  const baseName = `LFG • ${mode} • @${interaction.user.username}`;
+  let finalName = baseName;
+  if (notes) {
+    const short = notes.replace(/[\r\n]+/g, ' ').trim();
+    const extra = short.slice(0, 40);
+    const proposed = `${baseName} • ${extra}`;
+    finalName = proposed.slice(0, 96); // keep under typical limits
+  }
   const vc = await guild.channels.create({
-    name: `LFG • ${mode} • @${interaction.user.username}`,
+    name: finalName,
     type: ChannelType.GuildVoice,
     parent: guild.channels.cache.find(
       c => c.type === ChannelType.GuildCategory && c.name.toLowerCase().includes('lfg')
@@ -106,28 +114,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     reason: `LFG by ${interaction.user.tag}`
   });
   lfgVcIds.add(vc.id);
-  // Try setting voice channel status (topic) after creation
-  let topicSet = false;
-  if (notes) {
-    try {
-      const safe = notes
-        .replace(/https?:\/\/\S+/gi, '')
-        .replace(/discord\.gg\/\S+/gi, '')
-        .replace(/<@!?\d+>/g, '') // user mentions
-        .replace(/<@&\d+>/g, '') // role mentions
-        .replace(/<#[0-9]+>/g, '') // channel mentions
-        .replace(/@everyone|@here/gi, '[ping]')
-        .replace(/[\r\n]+/g, ' ')
-        .trim()
-        .slice(0, 128);
-      if (safe.length > 0) {
-        await vc.edit({ topic: safe }, 'Set LFG notes as channel status');
-        topicSet = true;
-      }
-    } catch (err) {
-      console.error('Failed to set VC topic', err);
-    }
-  }
 
   const member = await guild.members.fetch(interaction.user.id);
   if (member.voice?.channel) {
@@ -170,12 +156,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const lfgChannel = await interaction.client.channels.fetch(env.LFG_CHANNEL_ID);
     if (lfgChannel?.isTextBased()) {
       await lfgChannel.send({ embeds: [embed], components: [row] });
-      await interaction.reply({ content: `Posted your LFG in the LFG channel.${topicSet ? ' VC status set.' : ' VC status not set.'}` as const, ephemeral: true });
+      await interaction.reply({ content: 'Posted your LFG in the LFG channel.', ephemeral: true });
       return;
     }
   } catch {}
   await interaction.reply({ embeds: [embed], components: [row], ephemeral: false });
-  if (notes) {
-    await interaction.followUp({ content: topicSet ? 'VC status set.' : 'VC status not set (permission/filter?).', ephemeral: true });
-  }
 }
