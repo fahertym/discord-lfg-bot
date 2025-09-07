@@ -100,13 +100,19 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const vc = await guild.channels.create({
     name: `LFG • ${mode} • @${interaction.user.username}`,
     type: ChannelType.GuildVoice,
-    topic: notes || undefined,
     parent: guild.channels.cache.find(
       c => c.type === ChannelType.GuildCategory && c.name.toLowerCase().includes('lfg')
     )?.id,
     reason: `LFG by ${interaction.user.tag}`
   });
   lfgVcIds.add(vc.id);
+  // Try setting voice channel status (topic) after creation; ignore moderation errors
+  if (notes) {
+    try {
+      const safe = notes.slice(0, 128);
+      await vc.setTopic(safe);
+    } catch {}
+  }
 
   const member = await guild.members.fetch(interaction.user.id);
   if (member.voice?.channel) {
