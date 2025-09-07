@@ -1,9 +1,12 @@
-import { REST, Routes, Client, GatewayIntentBits, Interaction, ButtonInteraction, GuildMember } from 'discord.js';
+import { REST, Routes, Client, GatewayIntentBits, Interaction, ButtonInteraction, GuildMember, VoiceState, ChannelType } from 'discord.js';
 import { env } from '../lib/env';
 import * as LFG from '../commands/lfg';
 
 export async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(env.BOT_TOKEN);
+  // Clear any old GLOBAL commands from previous experiments
+  await rest.put(Routes.applicationCommands(env.CLIENT_ID), { body: [] });
+  // Overwrite GUILD commands for the dev server
   await rest.put(Routes.applicationGuildCommands(env.CLIENT_ID, env.DEV_GUILD_ID), {
     body: [LFG.data.toJSON()]
   });
@@ -23,6 +26,29 @@ export function bindInteractionHandlers(client: Client) {
     } catch (err) {
       console.error(err);
       if (i.isRepliable()) await i.reply({ content: 'Error occurred.', ephemeral: true });
+    }
+  });
+
+  // Empty VC cleanup: if a temp LFG VC becomes empty, delete it after 5 minutes
+  const emptyTimers = new Map<string, NodeJS.Timeout>();
+  client.on('voiceStateUpdate', async (oldState: VoiceState, newState: VoiceState) => {
+    const vc = oldState.channel ?? newState.channel;
+    if (!vc || vc.type !== ChannelType.GuildVoice) return;
+    const channel = await vc.fetch(true);
+    const isEmpty = channel.members.size === 0;
+    if (isEmpty) {
+      if (emptyTimers.has(channel.id)) return;
+      const t = setTimeout(async () => {
+        try {
+          const refreshed = await channel.fetch(true);
+          if (refreshed.members.size === 0) await refreshed.delete('LFG VC empty for 5 minutes');
+        } catch {/* no-op */}
+        finally { emptyTimers.delete(channel.id); }
+      }, 5 * 60 * 1000);
+      emptyTimers.set(channel.id, t);
+    } else {
+      const t = emptyTimers.get(channel.id);
+      if (t) { clearTimeout(t); emptyTimers.delete(channel.id); }
     }
   });
 }
