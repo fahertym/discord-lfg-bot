@@ -1,0 +1,14 @@
+version: "3.9"
+services:
+  discord-lfg-bot:
+    build: .
+    image: discord-lfg-bot:latest
+    container_name: discord-lfg-bot
+    restart: unless-stopped
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - CLIENT_ID=${CLIENT_ID}
+      - DEV_GUILD_ID=${DEV_GUILD_ID}
+      - LFG_CHANNEL_ID=${LFG_CHANNEL_ID}
+    # env_file:
+    #   - ./.env

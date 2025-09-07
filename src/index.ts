@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits } from 'discord.js';
-import { env } from './lib/env';
-import { bindInteractionHandlers, registerCommands } from './handlers/interactions';
+import { env } from './lib/env.js';
+import { bindInteractionHandlers, registerCommands } from './handlers/interactions.js';
 
 const client = new Client({
   intents: [

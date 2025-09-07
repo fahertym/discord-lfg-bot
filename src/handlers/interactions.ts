@@ -1,7 +1,7 @@
-import { REST, Routes, Client, GatewayIntentBits, Interaction, ButtonInteraction, GuildMember, VoiceState, ChannelType } from 'discord.js';
-import { env } from '../lib/env';
-import * as LFG from '../commands/lfg';
-import { emptyTimers, lfgVcIds } from '../lib/state';
+import { REST, Routes, Client, GatewayIntentBits, type Interaction, type ButtonInteraction, type GuildMember, VoiceState, ChannelType } from 'discord.js';
+import { env } from '../lib/env.js';
+import * as LFG from '../commands/lfg.js';
+import { emptyTimers, lfgVcIds } from '../lib/state.js';
 
 export async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(env.BOT_TOKEN);
@@ -56,6 +56,7 @@ export function bindInteractionHandlers(client: Client) {
 async function handleButton(i: ButtonInteraction) {
   if (i.customId.startsWith('lfg.join:')) {
     const vcId = i.customId.split(':')[1];
+    if (!vcId) return i.reply({ content: 'VC not found.', ephemeral: true });
     const member = i.member as GuildMember;
     try {
       const vc = await i.guild!.channels.fetch(vcId);
@@ -72,6 +73,7 @@ async function handleButton(i: ButtonInteraction) {
 
   if (i.customId.startsWith('lfg.cancel:')) {
     const vcId = i.customId.split(':')[1];
+    if (!vcId) return i.reply({ content: 'VC not found.', ephemeral: true });
     try {
       const ch = await i.guild!.channels.fetch(vcId);
       if (ch?.type === ChannelType.GuildVoice) {

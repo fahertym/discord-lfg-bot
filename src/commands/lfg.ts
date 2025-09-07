@@ -1,14 +1,20 @@
 import {
   SlashCommandBuilder,
-  ChatInputCommandInteraction,
+  type ChatInputCommandInteraction,
   ChannelType,
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  type GuildChannelCreateOptions,
+  type CategoryChannelResolvable
 } from 'discord.js';
-import { env } from '../lib/env';
-import { lfgVcIds } from '../lib/state';
+import { env } from '../lib/env.js';
+import { lfgVcIds } from '../lib/state.js';
+
+function hasSend(ch: unknown): ch is { send: (payload: unknown) => Promise<unknown> } {
+  return typeof (ch as any)?.send === 'function';
+}
 
 export const data = new SlashCommandBuilder()
   .setName('lfg')
@@ -105,14 +111,17 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const proposed = `${baseName} • ${extra}`;
     finalName = proposed.slice(0, 96); // keep under typical limits
   }
-  const vc = await guild.channels.create({
+  const parentCategory = guild.channels.cache.find(
+    c => c.type === ChannelType.GuildCategory && c.name.toLowerCase().includes('lfg')
+  ) as CategoryChannelResolvable | undefined;
+
+  const createOptions: GuildChannelCreateOptions & { type: ChannelType.GuildVoice } = {
     name: finalName,
     type: ChannelType.GuildVoice,
-    parent: guild.channels.cache.find(
-      c => c.type === ChannelType.GuildCategory && c.name.toLowerCase().includes('lfg')
-    )?.id,
+    parent: parentCategory ?? null,
     reason: `LFG by ${interaction.user.tag}`
-  });
+  };
+  const vc = await guild.channels.create(createOptions);
   lfgVcIds.add(vc.id);
 
   const member = await guild.members.fetch(interaction.user.id);
@@ -154,7 +163,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   // Send the card to the configured LFG text channel
   try {
     const lfgChannel = await interaction.client.channels.fetch(env.LFG_CHANNEL_ID);
-    if (lfgChannel?.isTextBased()) {
+    if (lfgChannel && hasSend(lfgChannel)) {
       await lfgChannel.send({ embeds: [embed], components: [row] });
       await interaction.reply({ content: 'Posted your LFG in the LFG channel.', ephemeral: true });
       return;
