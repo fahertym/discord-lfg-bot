@@ -1,0 +1,21 @@
+import { Client, GatewayIntentBits } from 'discord.js';
+import { env } from './lib/env';
+import { bindInteractionHandlers, registerCommands } from './handlers/interactions';
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
+});
+
+client.once('ready', async () => {
+  console.log(`✓ Logged in as ${client.user?.tag}`);
+  await registerCommands();
+});
+
+bindInteractionHandlers(client);
+client.login(env.BOT_TOKEN);
+

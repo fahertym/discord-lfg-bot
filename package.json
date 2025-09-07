@@ -1,0 +1,23 @@
+{
+	"dependencies": {
+		"discord.js": "^14.22.1",
+		"dotenv": "^17.2.2",
+		"zod": "^4.1.5"
+	},
+	"packageManager": "pnpm@10.15.1+sha512.34e538c329b5553014ca8e8f4535997f96180a1d0f614339357449935350d924e22f8614682191264ec33d1462ac21561aff97f6bb18065351c162c7e8f6de67",
+	"devDependencies": {
+		"@types/node": "^24.3.1",
+		"eslint": "^9.35.0",
+		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-import": "^2.32.0",
+		"prettier": "^3.6.2",
+		"ts-node": "^10.9.2",
+		"ts-node-dev": "^2.0.0",
+		"typescript": "^5.9.2"
+	},
+	"scripts": {
+		"dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+		"build": "tsc",
+		"start": "node dist/index.js"
+	}
+}
