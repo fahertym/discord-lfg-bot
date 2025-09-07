@@ -30,7 +30,7 @@ export function bindInteractionHandlers(client: Client) {
     }
   });
 
-  // Empty VC cleanup: if a tracked LFG VC becomes empty, delete after 5 minutes
+  // Empty VC cleanup: delete tracked LFG VC as soon as it becomes empty
   client.on('voiceStateUpdate', async (oldState: VoiceState, newState: VoiceState) => {
     const vc = oldState.channel ?? newState.channel;
     if (!vc || vc.type !== ChannelType.GuildVoice) return;
@@ -43,22 +43,12 @@ export function bindInteractionHandlers(client: Client) {
     }
     const isEmpty = channel.members.size === 0;
     if (isEmpty) {
-      if (emptyTimers.has(channel.id)) return;
-      const t = setTimeout(async () => {
-        try {
-          const refreshed = await channel.fetch(true);
-          if (refreshed.members.size === 0) await refreshed.delete('LFG VC empty for 5 minutes');
-          lfgVcIds.delete(channel.id);
-        } catch {
-          // no-op
-        } finally {
-          emptyTimers.delete(channel.id);
-        }
-      }, 5 * 60 * 1000);
-      emptyTimers.set(channel.id, t);
-    } else {
+      try {
+        await channel.delete('LFG VC became empty');
+      } catch {}
       const t = emptyTimers.get(channel.id);
       if (t) { clearTimeout(t); emptyTimers.delete(channel.id); }
+      lfgVcIds.delete(channel.id);
     }
   });
 }
