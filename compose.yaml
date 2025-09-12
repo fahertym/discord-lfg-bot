@@ -10,5 +10,12 @@ services:
       - CLIENT_ID=${CLIENT_ID}
       - DEV_GUILD_ID=${DEV_GUILD_ID}
       - LFG_CHANNEL_ID=${LFG_CHANNEL_ID}
-    # env_file:
-    #   - ./.env
+      - LFG_CATEGORY_ID=${LFG_CATEGORY_ID}
+      - CLEAR_GLOBAL=${CLEAR_GLOBAL}
+      - DEPLOY_GLOBAL=${DEPLOY_GLOBAL}
+      - PORT=3000
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3000)).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

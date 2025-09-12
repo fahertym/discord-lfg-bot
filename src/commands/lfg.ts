@@ -7,10 +7,12 @@ import {
   ButtonBuilder,
   ButtonStyle,
   type GuildChannelCreateOptions,
-  type CategoryChannelResolvable
+  type CategoryChannelResolvable,
+  PermissionsBitField,
+  type Message
 } from 'discord.js';
 import { env } from '../lib/env.js';
-import { lfgVcIds } from '../lib/state.js';
+import { lfgVcIds, ttlTimers, lfgHosts, waitlists, lastLfgAt, lfgByHost, lfgMessageByVc } from '../lib/state.js';
 
 function hasSend(ch: unknown): ch is { send: (payload: unknown) => Promise<unknown> } {
   return typeof (ch as any)?.send === 'function';
@@ -61,6 +63,13 @@ export const data = new SlashCommandBuilder()
           )
       )
       .addStringOption(o => o.setName('notes').setDescription('Short notes').setMaxLength(120))
+      .addStringOption(o =>
+        o
+          .setName('mentorship')
+          .setDescription('Mentorship signal')
+          .addChoices({ name: 'LF Mentor', value: 'LF Mentor' }, { name: 'Can Mentor', value: 'Can Mentor' })
+      )
+      .addStringOption(o => o.setName('need').setDescription('What do you need? e.g. 1T 1D').setMaxLength(15))
   )
   .addSubcommand(sc =>
     sc
@@ -91,18 +100,48 @@ export const data = new SlashCommandBuilder()
           )
       )
       .addStringOption(o => o.setName('notes').setDescription('Short notes').setMaxLength(120))
+      .addStringOption(o =>
+        o
+          .setName('mentorship')
+          .setDescription('Mentorship signal')
+          .addChoices({ name: 'LF Mentor', value: 'LF Mentor' }, { name: 'Can Mentor', value: 'Can Mentor' })
+      )
+      .addStringOption(o => o.setName('need').setDescription('What do you need? e.g. 1T 1D').setMaxLength(15))
   )
   .setDMPermission(false);
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const now = Date.now();
+  const last = lastLfgAt.get(interaction.user.id);
+  if (last && now - last < 2 * 60 * 1000) {
+    const remaining = Math.ceil((2 * 60 * 1000 - (now - last)) / 1000);
+    return interaction.reply({ content: `Please wait ${remaining}s before creating another listing.`, ephemeral: true });
+  }
+
   const sub = interaction.options.getSubcommand();
   const mode = interaction.options.getString('mode', true);
   const intent = interaction.options.getString('intent', true);
   // need and role_need removed
   const rank = sub === 'comp' ? interaction.options.getString('rank', true) : undefined;
+  const mentorship = interaction.options.getString('mentorship') ?? undefined;
+  const need = interaction.options.getString('need') ?? undefined;
   const notes = interaction.options.getString('notes') ?? '';
 
   const guild = interaction.guild!;
+  const me = guild.members.me;
+  if (!me?.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
+    return interaction.reply({ content: 'I need Manage Channels to create LFG rooms.', ephemeral: true });
+  }
+
+  // Prevent multiple active LFGs per host
+  const existingVcId = lfgByHost.get(interaction.user.id);
+  if (existingVcId) {
+    const existing = await guild.channels.fetch(existingVcId).catch(() => null);
+    if (existing && existing.type === ChannelType.GuildVoice) {
+      return interaction.reply({ content: `You already have an active LFG: <#${existing.id}>`, ephemeral: true });
+    }
+    lfgByHost.delete(interaction.user.id);
+  }
   const baseName = `LFG • ${mode} • @${interaction.user.username}`;
   let finalName = baseName;
   if (notes) {
@@ -111,9 +150,21 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const proposed = `${baseName} • ${extra}`;
     finalName = proposed.slice(0, 96); // keep under typical limits
   }
-  const parentCategory = guild.channels.cache.find(
-    c => c.type === ChannelType.GuildCategory && c.name.toLowerCase().includes('lfg')
-  ) as CategoryChannelResolvable | undefined;
+  let parentCategory = undefined as CategoryChannelResolvable | undefined;
+  if (env.LFG_CATEGORY_ID) {
+    const cat = await guild.channels.fetch(env.LFG_CATEGORY_ID).catch(() => null);
+    if (cat?.type === ChannelType.GuildCategory) parentCategory = cat as CategoryChannelResolvable;
+  }
+  if (!parentCategory) {
+    const found = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && c.name.toLowerCase().includes('lfg')) as CategoryChannelResolvable | undefined;
+    parentCategory = found ?? undefined;
+  }
+  if (!parentCategory) {
+    try {
+      const created = await guild.channels.create({ name: 'LFG', type: ChannelType.GuildCategory, reason: 'Create LFG category' });
+      parentCategory = created as CategoryChannelResolvable;
+    } catch {}
+  }
 
   const createOptions: GuildChannelCreateOptions & { type: ChannelType.GuildVoice } = {
     name: finalName,
@@ -123,6 +174,23 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   };
   const vc = await guild.channels.create(createOptions);
   lfgVcIds.add(vc.id);
+  lfgHosts.set(vc.id, interaction.user.id);
+  lfgByHost.set(interaction.user.id, vc.id);
+
+  // Start 60-min TTL that deletes the VC unless extended or cleared elsewhere
+  const ttlMs = 60 * 60 * 1000;
+  const timer = setTimeout(async () => {
+    try {
+      const ch = await guild.channels.fetch(vc.id);
+      if (ch?.type === ChannelType.GuildVoice) {
+        await ch.delete('LFG TTL expired');
+      }
+    } catch {}
+    ttlTimers.delete(vc.id);
+    lfgVcIds.delete(vc.id);
+    lfgHosts.delete(vc.id);
+  }, ttlMs);
+  ttlTimers.set(vc.id, timer);
 
   const member = await guild.members.fetch(interaction.user.id);
   if (member.voice?.channel) {
@@ -139,6 +207,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const isCompMode = sub === 'comp';
   const detailsParts: string[] = [];
   if (isCompMode && rank) detailsParts.push(`**Rank:** ${rank}`);
+  if (mentorship) detailsParts.push(`**Mentorship:** ${mentorship}`);
+  if (need) detailsParts.push(`**Need:** ${need}`);
 
   const embed = new EmbedBuilder()
     .setTitle(`LFG: ${mode} • ${intent}`)
@@ -157,6 +227,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`lfg.join:${vc.id}`).setLabel('Join').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`lfg.edit`).setLabel('Edit').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`lfg.extend:${vc.id}`).setLabel('Extend 60 min').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`lfg.notify:${vc.id}`).setLabel('Notify when full').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`lfg.cancel:${vc.id}`).setLabel('Cancel').setStyle(ButtonStyle.Danger)
   );
 
@@ -164,10 +236,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   try {
     const lfgChannel = await interaction.client.channels.fetch(env.LFG_CHANNEL_ID);
     if (lfgChannel && hasSend(lfgChannel)) {
-      await lfgChannel.send({ embeds: [embed], components: [row] });
+      const msg = (await lfgChannel.send({ embeds: [embed], components: [row] })) as Message;
+      lfgMessageByVc.set(vc.id, { channelId: msg.channelId, messageId: msg.id });
       await interaction.reply({ content: 'Posted your LFG in the LFG channel.', ephemeral: true });
       return;
     }
   } catch {}
-  await interaction.reply({ embeds: [embed], components: [row], ephemeral: false });
+  const replyMsg = (await interaction.reply({ embeds: [embed], components: [row], ephemeral: false, fetchReply: true })) as Message;
+  lfgMessageByVc.set(vc.id, { channelId: replyMsg.channelId, messageId: replyMsg.id });
+
+  lastLfgAt.set(interaction.user.id, now);
 }
