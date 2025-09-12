@@ -3,6 +3,7 @@ import { env } from '../lib/env.js';
 import * as LFG from '../commands/lfg.js';
 import { config } from '../lib/config.js';
 import { emptyTimers, lfgVcIds, ttlTimers, lfgHosts, lfgMessageByVc, waitlistQueue, lastMemberCount, openPingCooldown } from '../lib/state.js';
+import { parseBaseName, scheduleNameUpdate } from '../lib/vcNames.js';
 
 export async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(env.BOT_TOKEN);
@@ -71,6 +72,10 @@ export function bindInteractionHandlers(client: Client) {
     // Notify-on-open: when transitioning from full/overfull to below target size
     const prev = lastMemberCount.get(channel.id) ?? size;
     lastMemberCount.set(channel.id, size);
+
+    // Update dynamic name with debounce
+    const base = parseBaseName(channel.name);
+    await scheduleNameUpdate(channel, base, config.targetSize);
     if (config.enableWaitlist && prev >= config.targetSize && size < config.targetSize) {
       const now = Date.now();
       const last = openPingCooldown.get(channel.id) ?? 0;

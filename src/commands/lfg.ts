@@ -14,6 +14,7 @@ import {
 import { env } from '../lib/env.js';
 import { lfgVcIds, ttlTimers, lfgHosts, waitlists, lastLfgAt, lfgByHost, lfgMessageByVc } from '../lib/state.js';
 import { config } from '../lib/config.js';
+import { parseBaseName, scheduleNameUpdate } from '../lib/vcNames.js';
 
 function hasSend(ch: unknown): ch is { send: (payload: unknown) => Promise<unknown> } {
   return typeof (ch as any)?.send === 'function';
@@ -147,6 +148,17 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return interaction.reply({ content: 'I need Manage Channels to create LFG rooms.', ephemeral: true });
   }
 
+  // If user is already inside an LFG category VC, point them there
+  const currentVc = (await guild.members.fetch(interaction.user.id)).voice?.channel;
+  if (currentVc && currentVc.type === ChannelType.GuildVoice) {
+    const parent = currentVc.parent;
+    const isLfgParent = parent && parent.type === ChannelType.GuildCategory && parent.name.toLowerCase().includes('lfg');
+    const matchesEnv = env.LFG_CATEGORY_ID && parent?.id === env.LFG_CATEGORY_ID;
+    if (isLfgParent || matchesEnv) {
+      return interaction.reply({ content: `You are already in an LFG room: <#${currentVc.id}>`, ephemeral: true });
+    }
+  }
+
   // Prevent multiple active LFGs per host
   const existingVcId = lfgByHost.get(interaction.user.id);
   if (existingVcId) {
@@ -190,6 +202,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   lfgVcIds.add(vc.id);
   lfgHosts.set(vc.id, interaction.user.id);
   lfgByHost.set(interaction.user.id, vc.id);
+
+  // Stamp initial dynamic name
+  const base = parseBaseName(vc.name);
+  await scheduleNameUpdate(vc, base, config.targetSize, need);
 
   // Start TTL; auto-extend while occupied, delete when empty
   const onTtl = async () => {

@@ -28,3 +28,6 @@ export const lastMemberCount = new Map<string, number>();
 // Debounce pings on rapid join/leave (vcId -> epoch ms)
 export const openPingCooldown = new Map<string, number>();
 
+// Debounce channel renames to avoid rate limits (vcId -> epoch ms)
+export const nameUpdateCooldown = new Map<string, number>();
+
