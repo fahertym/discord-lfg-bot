@@ -38,6 +38,6 @@ COPY package.json ./package.json
 # App runs with environment variables; no .env copied
 CMD ["node", "dist/index.js"]
 
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD node -e "if(!process.env.PORT){process.exit(0)}else{fetch('http://127.0.0.1:'+process.env.PORT).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))}"
 
 

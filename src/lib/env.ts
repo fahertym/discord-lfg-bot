@@ -10,7 +10,7 @@ const RawEnv = z
     LFG_CATEGORY_ID: z.string().regex(/^\d+$/).optional().or(z.literal('')).default(''),
     CLEAR_GLOBAL: z.enum(['0', '1']).default('0'),
     DEPLOY_GLOBAL: z.enum(['0', '1']).default('0'),
-    PORT: z.string().regex(/^\d+$/).optional()
+    PORT: z.string().regex(/^\d+$/).optional().or(z.literal('')).default('')
   })
   .transform(v => ({
     ...v,

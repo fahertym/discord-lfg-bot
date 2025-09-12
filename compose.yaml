@@ -13,9 +13,8 @@ services:
       - LFG_CATEGORY_ID=${LFG_CATEGORY_ID}
       - CLEAR_GLOBAL=${CLEAR_GLOBAL}
       - DEPLOY_GLOBAL=${DEPLOY_GLOBAL}
-      - PORT=3000
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3000)).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "if(!process.env.PORT){process.exit(0)}else{fetch('http://127.0.0.1:'+process.env.PORT).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))}"]
       interval: 30s
       timeout: 5s
       retries: 3

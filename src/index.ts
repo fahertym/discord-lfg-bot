@@ -22,8 +22,8 @@ bindInteractionHandlers(client);
 client.login(env.BOT_TOKEN);
 
 // Minimal healthcheck server (guarded)
-if (config.enableHealthcheck) {
-  const port = Number(process.env.PORT || 3000);
+if (config.enableHealthcheck && env.PORT) {
+  const port = Number(env.PORT);
   http
     .createServer((req, res) => {
       const status = client.ws.status;
