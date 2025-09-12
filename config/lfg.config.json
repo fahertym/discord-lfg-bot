@@ -7,7 +7,6 @@
   "rateLimitSeconds": 120,
   "enableAdaptiveTTL": true,
   "adaptiveExtendMinutes": 30,
-  "enableExtendButton": true,
   "enableHealthcheck": true
 }
 

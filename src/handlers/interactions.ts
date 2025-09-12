@@ -136,41 +136,7 @@ async function handleButton(i: ButtonInteraction) {
     return i.reply({ content: 'Archived and VC removed.', ephemeral: true });
   }
 
-  if (i.customId.startsWith('lfg.v1.extend:')) {
-    const vcId = i.customId.split(':')[1];
-    if (!vcId) return i.reply({ content: 'VC not found.', ephemeral: true });
-    // Only host or users with ManageChannels can extend
-    const hostId = lfgHosts.get(vcId);
-    const member = i.member as GuildMember;
-    const isHost = hostId === member.id;
-    const canManage = member.permissions.has(PermissionsBitField.Flags.ManageChannels);
-    if (!isHost && !canManage) {
-      return i.reply({ content: 'Only the host or moderators can extend.', ephemeral: true });
-    }
-    const existing = ttlTimers.get(vcId);
-    if (existing) { clearTimeout(existing); }
-    const ttlMs = 60 * 60 * 1000;
-    const ch = await i.guild!.channels.fetch(vcId).catch(() => null);
-    if (!ch || ch.type !== ChannelType.GuildVoice) {
-      ttlTimers.delete(vcId);
-      lfgHosts.delete(vcId);
-      lfgVcIds.delete(vcId);
-      return i.reply({ content: 'VC not found.', ephemeral: true });
-    }
-    const newTimer = setTimeout(async () => {
-      try {
-        const fetched = await i.guild!.channels.fetch(vcId);
-        if (fetched?.type === ChannelType.GuildVoice) {
-          await fetched.delete('LFG TTL expired');
-        }
-      } catch {}
-      ttlTimers.delete(vcId);
-      lfgVcIds.delete(vcId);
-      lfgHosts.delete(vcId);
-    }, ttlMs);
-    ttlTimers.set(vcId, newTimer);
-    return i.reply({ content: 'Extended by 60 minutes.', ephemeral: true });
-  }
+  // Extend button removed: TTL is automatic while occupied
 
   if (i.customId.startsWith('lfg.v1.notifyOpen:')) {
     const vcId = i.customId.split(':')[1];

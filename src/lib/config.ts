@@ -9,7 +9,6 @@ export type LfgConfig = {
   rateLimitSeconds: number;
   enableAdaptiveTTL: boolean;
   adaptiveExtendMinutes: number;
-  enableExtendButton: boolean;
   enableHealthcheck: boolean;
 };
 
@@ -22,7 +21,6 @@ const defaults: LfgConfig = {
   rateLimitSeconds: 120,
   enableAdaptiveTTL: true,
   adaptiveExtendMinutes: 30,
-  enableExtendButton: true,
   enableHealthcheck: true
 };
 
