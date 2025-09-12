@@ -1,0 +1,14 @@
+{
+  "targetSize": 5,
+  "enableMentorship": true,
+  "enableNeedField": true,
+  "enableWaitlist": true,
+  "enableRateLimit": true,
+  "rateLimitSeconds": 120,
+  "enableAdaptiveTTL": true,
+  "adaptiveExtendMinutes": 30,
+  "enableExtendButton": true,
+  "enableHealthcheck": true
+}
+
+

@@ -1,7 +1,8 @@
 import { REST, Routes, Client, GatewayIntentBits, type Interaction, type ButtonInteraction, type GuildMember, VoiceState, ChannelType, PermissionsBitField, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder as Row, EmbedBuilder, type ModalSubmitInteraction } from 'discord.js';
 import { env } from '../lib/env.js';
 import * as LFG from '../commands/lfg.js';
-import { emptyTimers, lfgVcIds, ttlTimers, lfgHosts, waitlists, lfgMessageByVc } from '../lib/state.js';
+import { config } from '../lib/config.js';
+import { emptyTimers, lfgVcIds, ttlTimers, lfgHosts, lfgMessageByVc, waitlistQueue, lastMemberCount, openPingCooldown } from '../lib/state.js';
 
 export async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(env.BOT_TOKEN);
@@ -61,32 +62,41 @@ export function bindInteractionHandlers(client: Client) {
       if (tt) { clearTimeout(tt); ttlTimers.delete(channel.id); }
       lfgVcIds.delete(channel.id);
       lfgHosts.delete(channel.id);
-      waitlists.delete(channel.id);
       lfgMessageByVc.delete(channel.id);
+      waitlistQueue.delete(channel.id);
+      lastMemberCount.delete(channel.id);
+      openPingCooldown.delete(channel.id);
       return;
     }
-    // If lobby reaches 5, ping waitlist once and clear
-    if (size >= 5) {
-      const set = waitlists.get(channel.id);
-      if (set && set.size > 0) {
-        const msgRef = lfgMessageByVc.get(channel.id);
-        try {
-          if (msgRef) {
-            const ch = await client.channels.fetch(msgRef.channelId);
-            if (ch && 'send' in ch) {
-              const mentions = [...set].map(id => `<@${id}>`).join(' ');
-              await (ch as any).send({ content: `Lobby is full! ${mentions}` });
-            }
+    // Notify-on-open: when transitioning from full/overfull to below target size
+    const prev = lastMemberCount.get(channel.id) ?? size;
+    lastMemberCount.set(channel.id, size);
+    if (config.enableWaitlist && prev >= config.targetSize && size < config.targetSize) {
+      const now = Date.now();
+      const last = openPingCooldown.get(channel.id) ?? 0;
+      if (now - last > 5000) {
+        openPingCooldown.set(channel.id, now);
+        const queue = waitlistQueue.get(channel.id) ?? [];
+        const nextUser = queue.shift();
+        if (nextUser) {
+          if (queue.length === 0) waitlistQueue.delete(channel.id); else waitlistQueue.set(channel.id, queue);
+          const ref = lfgMessageByVc.get(channel.id);
+          if (ref) {
+            try {
+              const textCh = await client.channels.fetch(ref.channelId);
+              if (textCh && 'send' in textCh) {
+                await (textCh as any).send({ content: `<@${nextUser}> a spot just opened in <#${channel.id}>` });
+              }
+            } catch {}
           }
-        } catch {}
-        waitlists.delete(channel.id);
+        }
       }
     }
   });
 }
 
 async function handleButton(i: ButtonInteraction) {
-  if (i.customId.startsWith('lfg.join:')) {
+  if (i.customId.startsWith('lfg.v1.join:')) {
     const vcId = i.customId.split(':')[1];
     if (!vcId) return i.reply({ content: 'VC not found.', ephemeral: true });
     const member = i.member as GuildMember;
@@ -107,7 +117,7 @@ async function handleButton(i: ButtonInteraction) {
     return i.reply({ content: 'VC not found.', ephemeral: true });
   }
 
-  if (i.customId.startsWith('lfg.cancel:')) {
+  if (i.customId.startsWith('lfg.v1.cancel:')) {
     const vcId = i.customId.split(':')[1];
     if (!vcId) return i.reply({ content: 'VC not found.', ephemeral: true });
     try {
@@ -126,7 +136,7 @@ async function handleButton(i: ButtonInteraction) {
     return i.reply({ content: 'Archived and VC removed.', ephemeral: true });
   }
 
-  if (i.customId.startsWith('lfg.extend:')) {
+  if (i.customId.startsWith('lfg.v1.extend:')) {
     const vcId = i.customId.split(':')[1];
     if (!vcId) return i.reply({ content: 'VC not found.', ephemeral: true });
     // Only host or users with ManageChannels can extend
@@ -162,22 +172,23 @@ async function handleButton(i: ButtonInteraction) {
     return i.reply({ content: 'Extended by 60 minutes.', ephemeral: true });
   }
 
-  if (i.customId.startsWith('lfg.notify:')) {
+  if (i.customId.startsWith('lfg.v1.notifyOpen:')) {
     const vcId = i.customId.split(':')[1];
     if (!vcId) return i.reply({ content: 'VC not found.', ephemeral: true });
-    const set = waitlists.get(vcId) ?? new Set<string>();
-    if (set.has(i.user.id)) {
-      set.delete(i.user.id);
-      if (set.size === 0) waitlists.delete(vcId); else waitlists.set(vcId, set);
-      return i.reply({ content: 'You will no longer be notified.', ephemeral: true });
+    const queue = waitlistQueue.get(vcId) ?? [];
+    const idx = queue.indexOf(i.user.id);
+    if (idx >= 0) {
+      queue.splice(idx, 1);
+      if (queue.length === 0) waitlistQueue.delete(vcId); else waitlistQueue.set(vcId, queue);
+      return i.reply({ content: 'Removed from notifications.', ephemeral: true });
     }
-    set.add(i.user.id);
-    waitlists.set(vcId, set);
-    return i.reply({ content: 'Okay, I will notify you when the lobby is full.', ephemeral: true });
+    queue.push(i.user.id);
+    waitlistQueue.set(vcId, queue);
+    return i.reply({ content: 'I will ping you when a spot opens.', ephemeral: true });
   }
 
-  if (i.customId === 'lfg.edit') {
-    const modal = new ModalBuilder().setCustomId(`lfg.apply:${i.message.id}`).setTitle('Edit LFG');
+  if (i.customId.startsWith('lfg.v1.edit:')) {
+    const modal = new ModalBuilder().setCustomId(`lfg.v1.apply:${i.message.id}`).setTitle('Edit LFG');
     const notes = new TextInputBuilder().setCustomId('notes').setLabel('Notes').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(120);
     const intent = new TextInputBuilder().setCustomId('intent').setLabel('Intent').setStyle(TextInputStyle.Short).setRequired(false);
     await i.showModal(modal.addComponents(new Row<TextInputBuilder>().addComponents(notes), new Row<TextInputBuilder>().addComponents(intent)));
@@ -186,7 +197,7 @@ async function handleButton(i: ButtonInteraction) {
 }
 
 async function handleModal(i: ModalSubmitInteraction) {
-  if (!i.customId.startsWith('lfg.apply:')) return;
+  if (!i.customId.startsWith('lfg.v1.apply:')) return;
   const messageId = i.customId.split(':')[1];
   const newNotes = i.fields.getTextInputValue('notes')?.trim();
   const newIntent = i.fields.getTextInputValue('intent')?.trim();

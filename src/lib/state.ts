@@ -19,3 +19,12 @@ export const lfgByHost = new Map<string, string>();
 // Mapping from VC to its listing message so we can edit/ping later
 export const lfgMessageByVc = new Map<string, { channelId: string; messageId: string }>();
 
+// FIFO waitlist queue for notify-on-open (vcId -> array userIds)
+export const waitlistQueue = new Map<string, string[]>();
+
+// Track last observed member count per vc to detect openings
+export const lastMemberCount = new Map<string, number>();
+
+// Debounce pings on rapid join/leave (vcId -> epoch ms)
+export const openPingCooldown = new Map<string, number>();
+

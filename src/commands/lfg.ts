@@ -13,109 +13,133 @@ import {
 } from 'discord.js';
 import { env } from '../lib/env.js';
 import { lfgVcIds, ttlTimers, lfgHosts, waitlists, lastLfgAt, lfgByHost, lfgMessageByVc } from '../lib/state.js';
+import { config } from '../lib/config.js';
 
 function hasSend(ch: unknown): ch is { send: (payload: unknown) => Promise<unknown> } {
   return typeof (ch as any)?.send === 'function';
 }
 
-export const data = new SlashCommandBuilder()
-  .setName('lfg')
-  .setDescription('Create an LFG listing')
-  .addSubcommand(sc =>
-    sc
-      .setName('comp')
-      .setDescription('Competitive LFG')
-      .addStringOption(o =>
-        o
-          .setName('mode')
-          .setDescription('Competitive mode')
-          .setRequired(true)
-          .addChoices(
-            { name: 'Stadium-Comp', value: 'Stadium-Comp' },
-            { name: 'Comp-5v5', value: 'Comp-5v5' },
-            { name: 'Comp-6v6', value: 'Comp-6v6' }
-          )
-      )
-      .addStringOption(o =>
-        o
-          .setName('intent')
-          .setDescription('Play intent')
-          .setRequired(true)
-          .addChoices(
-            { name: 'Chill', value: 'Chill' },
-            { name: 'Climbing', value: 'Climbing' },
-            { name: 'Practice/Mentor', value: 'Practice/Mentor' },
-            { name: 'Scrims/Customs', value: 'Scrims/Customs' },
-            { name: 'Any', value: 'Any' }
-          )
-      )
-      .addStringOption(o =>
-        o
-          .setName('rank')
-          .setDescription('Approx rank range')
-          .setRequired(true)
-          .addChoices(
-            { name: 'Bronze/Silver', value: 'Bronze/Silver' },
-            { name: 'Gold/Plat', value: 'Gold/Plat' },
-            { name: 'Diamond/Master', value: 'Diamond/Master' },
-            { name: 'GM+', value: 'GM+' },
-            { name: 'Mixed/Any', value: 'Mixed/Any' }
-          )
-      )
-      .addStringOption(o => o.setName('notes').setDescription('Short notes').setMaxLength(120))
-      .addStringOption(o =>
-        o
-          .setName('mentorship')
-          .setDescription('Mentorship signal')
-          .addChoices({ name: 'LF Mentor', value: 'LF Mentor' }, { name: 'Can Mentor', value: 'Can Mentor' })
-      )
-      .addStringOption(o => o.setName('need').setDescription('What do you need? e.g. 1T 1D').setMaxLength(15))
-  )
-  .addSubcommand(sc =>
-    sc
-      .setName('qp')
-      .setDescription('Quick Play LFG')
-      .addStringOption(o =>
-        o
-          .setName('mode')
-          .setDescription('QP mode')
-          .setRequired(true)
-          .addChoices(
-            { name: 'Stadium-QP', value: 'Stadium-QP' },
-            { name: 'QP-5v5', value: 'QP-5v5' },
-            { name: 'QP-6v6', value: 'QP-6v6' }
-          )
-      )
-      .addStringOption(o =>
-        o
-          .setName('intent')
-          .setDescription('Play intent')
-          .setRequired(true)
-          .addChoices(
-            { name: 'Chill', value: 'Chill' },
-            { name: 'Climbing', value: 'Climbing' },
-            { name: 'Practice/Mentor', value: 'Practice/Mentor' },
-            { name: 'Scrims/Customs', value: 'Scrims/Customs' },
-            { name: 'Any', value: 'Any' }
-          )
-      )
-      .addStringOption(o => o.setName('notes').setDescription('Short notes').setMaxLength(120))
-      .addStringOption(o =>
-        o
-          .setName('mentorship')
-          .setDescription('Mentorship signal')
-          .addChoices({ name: 'LF Mentor', value: 'LF Mentor' }, { name: 'Can Mentor', value: 'Can Mentor' })
-      )
-      .addStringOption(o => o.setName('need').setDescription('What do you need? e.g. 1T 1D').setMaxLength(15))
-  )
-  .setDMPermission(false);
+export const data = (() => {
+  const b = new SlashCommandBuilder()
+    .setName('lfg')
+    .setDescription('Create an LFG listing')
+    .addSubcommand(sc =>
+      sc
+        .setName('comp')
+        .setDescription('Competitive LFG')
+        .addStringOption(o =>
+          o
+            .setName('mode')
+            .setDescription('Competitive mode')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Stadium-Comp', value: 'Stadium-Comp' },
+              { name: 'Comp-5v5', value: 'Comp-5v5' },
+              { name: 'Comp-6v6', value: 'Comp-6v6' }
+            )
+        )
+        .addStringOption(o =>
+          o
+            .setName('intent')
+            .setDescription('Play intent')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Chill', value: 'Chill' },
+              { name: 'Climbing', value: 'Climbing' },
+              { name: 'Practice/Mentor', value: 'Practice/Mentor' },
+              { name: 'Scrims/Customs', value: 'Scrims/Customs' },
+              { name: 'Any', value: 'Any' }
+            )
+        )
+        .addStringOption(o =>
+          o
+            .setName('rank')
+            .setDescription('Approx rank range')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Bronze/Silver', value: 'Bronze/Silver' },
+              { name: 'Gold/Plat', value: 'Gold/Plat' },
+              { name: 'Diamond/Master', value: 'Diamond/Master' },
+              { name: 'GM+', value: 'GM+' },
+              { name: 'Mixed/Any', value: 'Mixed/Any' }
+            )
+        )
+        .addStringOption(o => o.setName('notes').setDescription('Short notes').setMaxLength(120))
+    )
+    .addSubcommand(sc =>
+      sc
+        .setName('qp')
+        .setDescription('Quick Play LFG')
+        .addStringOption(o =>
+          o
+            .setName('mode')
+            .setDescription('QP mode')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Stadium-QP', value: 'Stadium-QP' },
+              { name: 'QP-5v5', value: 'QP-5v5' },
+              { name: 'QP-6v6', value: 'QP-6v6' }
+            )
+        )
+        .addStringOption(o =>
+          o
+            .setName('intent')
+            .setDescription('Play intent')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Chill', value: 'Chill' },
+              { name: 'Climbing', value: 'Climbing' },
+              { name: 'Practice/Mentor', value: 'Practice/Mentor' },
+              { name: 'Scrims/Customs', value: 'Scrims/Customs' },
+              { name: 'Any', value: 'Any' }
+            )
+        )
+        .addStringOption(o => o.setName('notes').setDescription('Short notes').setMaxLength(120))
+    )
+    .setDMPermission(false);
+
+  if (config.enableMentorship) {
+    b.options[0].options?.push(
+      {
+        type: 3,
+        name: 'mentorship',
+        description: 'Mentorship signal',
+        required: false,
+        choices: [
+          { name: 'LF Mentor', value: 'LF Mentor' },
+          { name: 'Can Mentor', value: 'Can Mentor' }
+        ]
+      } as any
+    );
+    b.options[1].options?.push(
+      {
+        type: 3,
+        name: 'mentorship',
+        description: 'Mentorship signal',
+        required: false,
+        choices: [
+          { name: 'LF Mentor', value: 'LF Mentor' },
+          { name: 'Can Mentor', value: 'Can Mentor' }
+        ]
+      } as any
+    );
+  }
+  if (config.enableNeedField) {
+    b.options[0].options?.push({ type: 3, name: 'need', description: 'What do you need? e.g. 1T 1D', required: false, max_length: 15 } as any);
+    b.options[1].options?.push({ type: 3, name: 'need', description: 'What do you need? e.g. 1T 1D', required: false, max_length: 15 } as any);
+  }
+  return b;
+})();
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   const now = Date.now();
-  const last = lastLfgAt.get(interaction.user.id);
-  if (last && now - last < 2 * 60 * 1000) {
-    const remaining = Math.ceil((2 * 60 * 1000 - (now - last)) / 1000);
-    return interaction.reply({ content: `Please wait ${remaining}s before creating another listing.`, ephemeral: true });
+  if (config.enableRateLimit) {
+    const last = lastLfgAt.get(interaction.user.id);
+    const windowMs = config.rateLimitSeconds * 1000;
+    if (last && now - last < windowMs) {
+      const remaining = Math.ceil((windowMs - (now - last)) / 1000);
+      return interaction.reply({ content: `Please wait ${remaining}s before creating another listing.`, ephemeral: true });
+    }
   }
 
   const sub = interaction.options.getSubcommand();
@@ -177,19 +201,25 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   lfgHosts.set(vc.id, interaction.user.id);
   lfgByHost.set(interaction.user.id, vc.id);
 
-  // Start 60-min TTL that deletes the VC unless extended or cleared elsewhere
-  const ttlMs = 60 * 60 * 1000;
-  const timer = setTimeout(async () => {
+  // Start TTL with adaptive extension if configured
+  const onTtl = async () => {
     try {
       const ch = await guild.channels.fetch(vc.id);
       if (ch?.type === ChannelType.GuildVoice) {
+        if (config.enableAdaptiveTTL && ch.members.size > 0) {
+          const ms = Math.max(1, config.adaptiveExtendMinutes) * 60 * 1000;
+          const newTimer = setTimeout(onTtl, ms);
+          ttlTimers.set(vc.id, newTimer);
+          return;
+        }
         await ch.delete('LFG TTL expired');
       }
     } catch {}
     ttlTimers.delete(vc.id);
     lfgVcIds.delete(vc.id);
     lfgHosts.delete(vc.id);
-  }, ttlMs);
+  };
+  const timer = setTimeout(onTtl, 60 * 60 * 1000);
   ttlTimers.set(vc.id, timer);
 
   const member = await guild.members.fetch(interaction.user.id);
@@ -224,13 +254,18 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     .setColor(0x30a7ff)
     .setFooter({ text: `VC: ${vc.name} • ${footer}` });
 
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`lfg.join:${vc.id}`).setLabel('Join').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`lfg.edit`).setLabel('Edit').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`lfg.extend:${vc.id}`).setLabel('Extend 60 min').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`lfg.notify:${vc.id}`).setLabel('Notify when full').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`lfg.cancel:${vc.id}`).setLabel('Cancel').setStyle(ButtonStyle.Danger)
-  );
+  const components: ButtonBuilder[] = [
+    new ButtonBuilder().setCustomId(`lfg.v1.join:${vc.id}`).setLabel('Join').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`lfg.v1.edit:${vc.id}`).setLabel('Edit').setStyle(ButtonStyle.Secondary)
+  ];
+  if (config.enableExtendButton) {
+    components.push(new ButtonBuilder().setCustomId(`lfg.v1.extend:${vc.id}`).setLabel('Extend 60 min').setStyle(ButtonStyle.Primary));
+  }
+  if (config.enableWaitlist) {
+    components.push(new ButtonBuilder().setCustomId(`lfg.v1.notifyOpen:${vc.id}`).setLabel('Notify on open').setStyle(ButtonStyle.Secondary));
+  }
+  components.push(new ButtonBuilder().setCustomId(`lfg.v1.cancel:${vc.id}`).setLabel('Cancel').setStyle(ButtonStyle.Danger));
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(...components);
 
   // Send the card to the configured LFG text channel
   try {
